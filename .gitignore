@@ -1,0 +1,42 @@
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Downloaded model weights and local inference assets
+models/
+*.onnx
+*.onnx.json
+*.bin
+*.pt
+*.pth
+*.safetensors
+
+# Generated and temporary audio/output files
+outputs/*.wav
+outputs/*.mp3
+outputs/*.m4a
+outputs/*.flac
+outputs/*.ogg
+outputs/tmp/
+outputs/temp/
+tmp/
+temp/
+
+# Local tooling and editor files
+.vscode/
+.idea/
+*.log
