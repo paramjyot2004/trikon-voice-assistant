@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -74,6 +75,54 @@ class VoiceAssistant:
             tts_latency=time.perf_counter() - tts_start,
             total_latency=time.perf_counter() - total_start,
         )
+
+    def process_audio_stream(
+        self,
+        audio_path: str | Path,
+        output_path: str | Path = DEFAULT_OUTPUT,
+    ) -> Iterator[tuple[str, str, PipelineResult | None]]:
+        """Yield transcript/partial-response pairs, then the completed pipeline result."""
+        total_start = time.perf_counter()
+        try:
+            transcript, stt_latency = self.stt_service.transcribe(audio_path)
+        except FileNotFoundError as error:
+            raise VoiceAssistantError(str(error)) from error
+        except (OSError, RuntimeError, ValueError) as error:
+            raise VoiceAssistantError(f"Speech-to-text failed: {error}") from error
+
+        if not transcript:
+            raise VoiceAssistantError("Speech-to-text produced an empty transcript")
+
+        llm_start = time.perf_counter()
+        response_parts: list[str] = []
+        try:
+            response_stream = self.llm_service.generate_stream(transcript)
+            for chunk in response_stream:
+                response_parts.append(chunk)
+                yield transcript, "".join(response_parts), None
+        except (LLMServiceError, ValueError) as error:
+            raise VoiceAssistantError(str(error)) from error
+        response = "".join(response_parts).strip()
+        if not response:
+            raise VoiceAssistantError("Ollama returned an empty response")
+        llm_latency = time.perf_counter() - llm_start
+
+        tts_start = time.perf_counter()
+        try:
+            audio_output = synthesize_speech(response, output_path)
+        except (FileNotFoundError, TTSServiceError, ValueError) as error:
+            raise VoiceAssistantError(f"Text-to-speech failed: {error}") from error
+
+        result = PipelineResult(
+            transcript=transcript,
+            response=response,
+            audio_path=audio_output,
+            stt_latency=stt_latency,
+            llm_latency=llm_latency,
+            tts_latency=time.perf_counter() - tts_start,
+            total_latency=time.perf_counter() - total_start,
+        )
+        yield transcript, response, result
 
 
 def main() -> None:

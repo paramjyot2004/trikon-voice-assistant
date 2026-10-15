@@ -13,7 +13,7 @@ def main() -> None:
     parser.add_argument("audio_file", type=Path, help="Path to a WAV, MP3, M4A, or FLAC file")
     args = parser.parse_args()
 
-    print("Loading Faster-Whisper tiny model (CPU INT8)...")
+    print("Loading Faster-Whisper base model (CPU INT8)...")
     service = SpeechToTextService()
     text, latency = service.transcribe(args.audio_file)
 

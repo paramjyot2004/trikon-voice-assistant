@@ -8,7 +8,7 @@ from pathlib import Path
 from faster_whisper import WhisperModel
 
 
-DEFAULT_MODEL_SIZE = "tiny"
+DEFAULT_MODEL_SIZE = "base"
 DEFAULT_DEVICE = "cpu"
 DEFAULT_COMPUTE_TYPE = "int8"
 
@@ -35,7 +35,17 @@ class SpeechToTextService:
             raise FileNotFoundError(f"Audio file not found: {path}")
 
         start = time.perf_counter()
-        segments, _ = self.model.transcribe(str(path))
+        segments, info = self.model.transcribe(
+            str(path),
+            language=None,
+            beam_size=5,
+            vad_filter=True,
+        )
+        print(
+            f"Detected language: {info.language} "
+            f"(probability: {info.language_probability:.2f})",
+            flush=True,
+        )
         text = " ".join(segment.text.strip() for segment in segments).strip()
         latency = time.perf_counter() - start
         return text, latency

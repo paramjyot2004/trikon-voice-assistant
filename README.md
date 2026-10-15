@@ -50,7 +50,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the detailed architecture
 | Programming language | Python |
 | Web interface | Gradio 6.30.0 |
 | Speech-to-text | Faster-Whisper 1.2.1 |
-| STT model | Faster-Whisper `tiny`, CPU, INT8 |
+| STT model | Faster-Whisper `base`, CPU, INT8, automatic language detection |
 | Language model runtime | Ollama |
 | Language model | Qwen `qwen2.5:1.5b` |
 | Text-to-speech | Piper |
@@ -292,11 +292,11 @@ Network access may still be required for initial installation and model download
 - Recognition accuracy varies with accents, background noise, and proper names.
 - Performance is constrained by available CPU and memory.
 - Model and voice assets require separate setup.
-- Streaming, voice activity detection, and interruption handling are not implemented in the current basic interface.
+- LLM response text streams progressively in the Gradio interface; Piper still generates complete-response audio after the final text is available.
 
 ## Future improvements
 
-- Streaming speech recognition and incremental response generation
+- Streaming speech recognition and sentence-level TTS
 - Voice activity detection and interruption handling
 - Better recognition of proper names and multilingual speech
 - Configurable voice selection and language settings

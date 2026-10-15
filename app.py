@@ -6,6 +6,7 @@ import threading
 import tempfile
 import traceback
 import wave
+from collections.abc import Iterator
 from pathlib import Path
 from uuid import uuid4
 
@@ -96,11 +97,12 @@ def _audio_input_to_file(
 def process_turn(
     audio_path: str | Path | tuple[int, np.ndarray] | None,
     assistant: VoiceAssistant | None,
-) -> tuple[str, str, str | None, str, list[dict[str, str]], VoiceAssistant | None]:
-    """Process one audio turn and return all UI values."""
+) -> Iterator[tuple[str, str, str | None, str, list[dict[str, str]], VoiceAssistant | None]]:
+    """Process one audio turn and yield UI values as the response is generated."""
     if audio_path is None:
         message = "Error: no audio was received. Record speech or upload a WAV file first."
-        return message, "", None, message, _history_messages(assistant), assistant
+        yield message, "", None, message, _history_messages(assistant), assistant
+        return
 
     temporary_audio = False
     try:
@@ -119,7 +121,8 @@ def process_turn(
     except (OSError, ValueError) as error:
         message = f"Error: {error}"
         print(message, flush=True)
-        return message, "", None, message, _history_messages(assistant), assistant
+        yield message, "", None, message, _history_messages(assistant), assistant
+        return
 
     try:
         if assistant is None:
@@ -130,30 +133,41 @@ def process_turn(
 
         output_path = OUTPUT_DIR / f"response_{uuid4().hex}.wav"
         try:
-            result = assistant.process_audio(audio_file, output_path)
+            for transcript, response, result in assistant.process_audio_stream(
+                audio_file, output_path
+            ):
+                if result is None:
+                    yield (
+                        transcript,
+                        response,
+                        None,
+                        "Generating response...",
+                        _history_messages(assistant),
+                        assistant,
+                    )
+                else:
+                    metrics = (
+                        f"STT: {result.stt_latency:.2f}s | "
+                        f"LLM: {result.llm_latency:.2f}s | "
+                        f"TTS: {result.tts_latency:.2f}s | "
+                        f"Total: {result.total_latency:.2f}s"
+                    )
+                    yield (
+                        result.transcript,
+                        result.response,
+                        str(result.audio_path),
+                        metrics,
+                        _history_messages(assistant),
+                        assistant,
+                    )
         except VoiceAssistantError as error:
             traceback.print_exc()
             message = f"Error: {error}"
-            return message, "", None, message, _history_messages(assistant), assistant
+            yield message, "", None, message, _history_messages(assistant), assistant
         except Exception as error:
             traceback.print_exc()
             message = f"Unexpected processing error: {error}"
-            return message, "", None, message, _history_messages(assistant), assistant
-
-        metrics = (
-            f"STT: {result.stt_latency:.2f}s | "
-            f"LLM: {result.llm_latency:.2f}s | "
-            f"TTS: {result.tts_latency:.2f}s | "
-            f"Total: {result.total_latency:.2f}s"
-        )
-        return (
-            result.transcript,
-            result.response,
-            str(result.audio_path),
-            metrics,
-            _history_messages(assistant),
-            assistant,
-        )
+            yield message, "", None, message, _history_messages(assistant), assistant
     finally:
         if temporary_audio:
             audio_file.unlink(missing_ok=True)
